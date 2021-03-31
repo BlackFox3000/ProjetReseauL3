@@ -1,14 +1,8 @@
 import java.io.*;
 import java.net.Socket;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Scanner;
-/*
- * www.codeurjava.com
- */
+
 public class Client1 {
 
     public static void main(String[] args) {
@@ -30,7 +24,6 @@ public class Client1 {
             out = new PrintWriter(clientSocket.getOutputStream());
             //flux pour recevoir
             in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-
             Thread envoyer = new Thread(new Runnable() {
                 String msg;
                 @Override
@@ -53,24 +46,26 @@ public class Client1 {
                     try {
                         msg = in.readLine();
                         while(msg!=null){
-                            System.out.println("Serveur : "+msg);
+                            if(! msg.equals("##Transmition-finish##")) {
+                                System.out.println("Serveur : " + msg);
 
-                            if(msg.equals("$$download-mode-on$$")) {
-                                System.out.println("Début du téléchargement");
-                                download(in);
-                            }
-
-                            //initialisation LIST
-                            if(FIRST_TIME[0]){
-                                FIRST_TIME[0] = false;
-                                out.println("LIST");
-                                out.flush();
+                                if (msg.equals("$$download-mode-on$$")) {
+                                    System.out.println("Début du téléchargement");
+                                    download(in);
                                 }
-                            msg = in.readLine();
-                        }
-                        System.out.println("Serveur déconecté");
-                        out.close();
-                        clientSocket.close();
+
+                                //initialisation LIST
+                                if (FIRST_TIME[0]) {
+                                    FIRST_TIME[0] = false;
+                                    out.println("LIST");
+                                    out.flush();
+                                }
+                            }
+                                msg = in.readLine();
+                            }
+                            System.out.println("Serveur déconecté");
+                            out.close();
+                            clientSocket.close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
