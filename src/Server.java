@@ -1,12 +1,13 @@
 import java.net.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Enumeration;
-import java.util.Scanner;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 class Server {
+
+    public ConcurrentHashMap<String, List<Serveur>> locateFiles = initialiseLocateMap();
+    public ConcurrentHashMap<String,List<Serveur>> externeFiles;
 
     private static String PATH = "Documents";
 
@@ -59,6 +60,9 @@ class Server {
         InetAddress hote;
         int port;
 
+
+        //initialisationServers();
+
         Handler(Socket socket) throws IOException {
             this.socket = socket;
             out = new PrintWriter(socket.getOutputStream(), true);
@@ -93,7 +97,8 @@ class Server {
                         if (lines[0].equals("HELP")) {
                             out.println("==================== HELP ====================");
                             out.println("HELP: list les commandes disponibles");
-                            out.println("LIST: permet de demander la liste des fichiers du serveur");
+                            out.println("LIST [num_page]: permet de demander la liste des fichiers du serveur");
+                            out.println("LISTALL : permet de demander la liste de tout les fichiers du serveur");
                             out.println("GET [filemane]: permet de télécharger le fichier \"filename\"");
                             out.println("READ [filemane]: permet de lire le fichier \"filename\"");
                             out.println("CREATE [filemane]: permet de créer un nouveau fichier vide nommé \"filename\"");
@@ -124,6 +129,17 @@ class Server {
                             assert files != null;
                             //out.println("WIP ");
                             for (File doc : subFiles)
+                                out.println(doc.getName());
+
+                            //managementFiles.list();
+                        }
+                        else if (lines[0].equals("LISTALL")) {
+                            File file = new File(PATH);
+                            File[] files = file.listFiles();
+
+                            assert files != null;
+                            //out.println("WIP ");
+                            for (File doc : files)
                                 out.println(doc.getName());
 
                             //managementFiles.list();
@@ -173,9 +189,9 @@ class Server {
                                 out.println("Commande incomplete: test [ip] [port] [commande]");
                             else {
                                 String ip = (String) lines[1];
-                                Integer port = Integer.parseInt( lines[2] );
+                                Integer port = Integer.parseInt(lines[2]);
                                 String commande = (String) lines[3];
-                                connexion(ip,port,commande);
+                                connexion(ip, port, commande);
                             }
                         }
                         else if (lines[0].equals("DELETE")) {
@@ -186,7 +202,8 @@ class Server {
                                 String fileName = (String) lines[1];
                                 managementFiles.deleteFile(fileName);
                             }
-                        } else {
+                        }
+                        else {
                             out.println("ERROR : unknown request");
                             out.println("ERROR : tapper HELP pour plus d'informations");
                         }
@@ -210,6 +227,71 @@ class Server {
         }
     }
 
+    private void initialisationServers() throws IOException {
+        List<List<String>> map = serverTxtToMap();
+        HashMap<String, Serveur> gpsServer = new HashMap<>();
+        for (int i = 0; i < map.size(); i++) {
+            List<String> serverLi = map.get(i);
+            Serveur server= new Serveur(serverLi.get(0), )
+            List<String>  containtFiles = getFiles(server.get(0), Integer.parseInt(server.get(1)));
+
+            for(int indexFile =0; indexFile<containtFiles.size(); indexFile++){
+                if(gpsServer.get(containtFiles.get(i).))
+            }
+        }
+    }
+
+    public static List<List<String>> serverTxtToMap() throws IOException {
+        File file = new File("servers.txt");
+        FileReader fr = new FileReader(file);
+        List<List<String>> liste = new ArrayList<>();
+
+        BufferedReader br = new BufferedReader(fr);
+        StringBuffer sb = new StringBuffer();
+        String line;
+        Boolean isThisTheFirstLine = true;
+        while ((line = br.readLine()) != null) {
+            if (!isThisTheFirstLine) {
+                List<String> server = new ArrayList<>();
+                List<String> lines = Arrays.asList(line.split(" "));
+                System.out.println(lines);
+                server.add(lines.get(0));
+                server.add(lines.get(1));
+                System.out.println(server.get(0));
+                System.out.println(server.get(1));
+                liste.add(server);
+
+            }
+            isThisTheFirstLine = false;
+
+        }
+        fr.close();
+        System.out.println(liste);
+        return liste;
+    }
+
+    public void initialiseLocateMap(String ip,int port) {
+        File file = new File("C:\\Users\\Arthur\\Desktop\\commade\\src\\com\\company\\dossier");
+        File[] files = file.listFiles();
+        ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
+        Serveur serveur = new Serveur(ip, port);
+
+        for (File doc : files) {
+            String nameFile = doc.getName();
+            System.out.println(doc.getName());
+            if (hasmap.containsKey(nameFile)) {
+                // hm[namefile] = [S1|text.txt]
+                List<Serveur> liste = hasmap.get(nameFile);
+                liste.add(serveur);
+                hasmap.put(nameFile, liste);
+            } else {
+                List<Serveur> listServeurs = new ArrayList<>();
+                listServeurs.add(serveur);
+                hasmap.put(nameFile, listServeurs);
+            }
+        }
+        this.externeFiles= hasmap;
+    }
 
     class ManagementFiles {
         public ConcurrentHashMap<String, FileHandle> concurrentHashMap = new ConcurrentHashMap<>();
@@ -359,10 +441,10 @@ class Server {
             final Thread[] envoyer = {new Thread(new Runnable() {
                 @Override
                 public void run() {
-                 //   while (!finish[0]) {
-                        out.println(msg_send);
-                        out.flush();
-                  //  }
+                    //   while (!finish[0]) {
+                    out.println(msg_send);
+                    out.flush();
+                    //  }
                 }
             })};
             envoyer[0].start();
@@ -376,18 +458,16 @@ class Server {
                     try {
                         msg_receive = in.readLine();
                         while (msg_receive != null) {
-                            System.out.println("Serveur pere: " + msg_receive);
-                            if (msg_receive.equals("##Transmition-finish##")) {
-                                //finish[0] = true;
-                                System.out.println("OUAIIII J' AI FINI !!!");
-                            }
+                            System.out.println(ip + " " + msg_receive);
+//                            if (msg_receive.equals("##Transmition-finish##")) {
+//                                //finish[0] = true;
+//                                System.out.println("OUAIIII J' AI FINI !!!");
+//                            }
 
 //                            if(msg_receive.equals("$$download-mode-on$$")) {
 //                                System.out.println("Début du téléchargement");
 //                                download(in);
 //                            }
-
-
                             msg_receive = in.readLine();
                         }
                         System.out.println("Serveur déconecté");
@@ -452,6 +532,69 @@ class Server {
 
         }
     }
+
+    public List<String> getFiles(String ip, int port) {
+        Socket clientSocket;
+        PrintWriter out;
+        BufferedReader in;
+        List<String> listFIles = new ArrayList<>();
+
+        System.out.println("Essai de connexion à   " + ip + " sur le port " + port + "\n");
+        /* Session */
+        try {
+            /*  Connexion
+             * les informations du serveur ( port et adresse IP ou nom d'hote
+             * 127.0.0.1 est l'adresse local de la machine
+             */
+            clientSocket = new Socket(ip, port);
+
+            //flux pour envoyer
+            out = new PrintWriter(clientSocket.getOutputStream());
+            //flux pour recevoir
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
+            //envoie de la requête
+            final Thread[] envoyer = {new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    out.println("LISTALL");
+                    out.flush();
+
+                }
+            })};
+            envoyer[0].start();
+
+            Thread recevoir = new Thread(new Runnable() {
+                String msg_receive;
+
+                @Override
+                public void run() {
+
+                    try {
+                        msg_receive = in.readLine();
+                        while (msg_receive != null) {
+                            System.out.println("[getFiles]" + ip + " " + msg_receive);
+                            listFIles.add(msg_receive);
+                            msg_receive = in.readLine();
+                        }
+                        System.out.println("Serveur déconecté");
+                        out.close();
+                        clientSocket.close();
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+
+            });
+            recevoir.start();
+
+        } catch (IOException e) {
+        }
+
+        return listFIles;
+    }
+
 }
 
 
