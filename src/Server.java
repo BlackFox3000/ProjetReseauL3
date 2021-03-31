@@ -1,13 +1,15 @@
 import java.net.*;
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 class Server {
 
-    public ConcurrentHashMap<String, List<Serveur>> locateFiles = initialiseLocateMap();
+    public ConcurrentHashMap<String, List<Serveur>> locateFiles;
     public ConcurrentHashMap<String,List<Serveur>> externeFiles;
+    String ip = "localhost";
+    int port;
+    Serveur serveur;
 
     private static String PATH = "Documents";
 
@@ -15,7 +17,13 @@ class Server {
     public void demarrer(int port) {
         ServerSocket ssocket; // socket d'écoute utilisée par le serveur
 
-        System.out.println("Lancement du serveur sur le port " + port);
+        System.out.println("Lancement du serveur sur le port " + port );
+;
+        //initialisation des parametre du seveur + de la hashmapLocal
+        this.port = port;
+        this.serveur = new Serveur(this.ip, this.port);
+        initialiseLocateFiles(this.ip,port);
+
         try {
             ssocket = new ServerSocket(port);
             ssocket.setReuseAddress(true); /* rend le port réutilisable rapidement */
@@ -69,6 +77,7 @@ class Server {
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             hote = socket.getInetAddress();
             port = socket.getPort();
+
         }
 
         public void run() {
@@ -78,6 +87,7 @@ class Server {
             try {
                 /* envoi du message d'accueil */
                 out.println("Bonjour " + hote + "! (vous utilisez le port " + port + ")");
+
                 ManagementFiles managementFiles = new ManagementFiles(PATH, out);
 
                 do {
@@ -227,16 +237,32 @@ class Server {
         }
     }
 
-    private void initialisationServers() throws IOException {
+    /**
+     * Initialise la hashmap de fichier (key) et de list de serveur où ils sont présents List<Serveur>
+     * @throws IOException
+     */
+    private void initialisationExternFiles() throws IOException {
+        //Lis le server.text et retourne les serveurs connus
         List<List<String>> map = serverTxtToMap();
-        HashMap<String, Serveur> gpsServer = new HashMap<>();
+
+
+        //parcourt de tout les serveurs
         for (int i = 0; i < map.size(); i++) {
             List<String> serverLi = map.get(i);
-            Serveur server= new Serveur(serverLi.get(0), )
-            List<String>  containtFiles = getFiles(server.get(0), Integer.parseInt(server.get(1)));
+            //---------------------------- 100.100.100.200  ---------------- 23584 ----> server.txt
+            Serveur server= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
+            List<String> listTitlesFiles = getFiles(server.ip, server.port);
 
-            for(int indexFile =0; indexFile<containtFiles.size(); indexFile++){
-                if(gpsServer.get(containtFiles.get(i).))
+            for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
+                //on vérifie que la clef est présente dans notre hashmap
+                String titleFile = listTitlesFiles.get(i);
+                List<Serveur> listServeurs;
+                if(this.externeFiles.containsKey(titleFile))
+                    listServeurs = this.externeFiles.get(titleFile);
+                else
+                    listServeurs = new ArrayList<>();
+                listServeurs.add(server);
+                this.externeFiles.put(titleFile, listServeurs);
             }
         }
     }
@@ -270,8 +296,8 @@ class Server {
         return liste;
     }
 
-    public void initialiseLocateMap(String ip,int port) {
-        File file = new File("C:\\Users\\Arthur\\Desktop\\commade\\src\\com\\company\\dossier");
+    public void initialiseLocateFiles(String ip, int port) {
+        File file = new File("Documents");
         File[] files = file.listFiles();
         ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
         Serveur serveur = new Serveur(ip, port);
@@ -416,6 +442,15 @@ class Server {
         }
     }
 
+    public void deleteExterneFile(String fileName, Serveur serveur){
+        if (locateFiles.get(fileName).size() > 1) {
+            List<Serveur> listeServeur = locateFiles.get(fileName);
+            listeServeur.remove(serveur);
+            locateFiles.put(fileName, listeServeur);
+        }
+        else
+            locateFiles.remove(fileName);
+    }
 
     public void connexion(String ip, int port, String msg_send) {
         Socket clientSocket;
@@ -533,6 +568,12 @@ class Server {
         }
     }
 
+    /**
+     * Envoie un READALL sur le serveur cible
+     * @param ip
+     * @param port
+     * @return liste de fichier List<String>
+     */
     public List<String> getFiles(String ip, int port) {
         Socket clientSocket;
         PrintWriter out;
@@ -574,6 +615,7 @@ class Server {
                         msg_receive = in.readLine();
                         while (msg_receive != null) {
                             System.out.println("[getFiles]" + ip + " " + msg_receive);
+                            // récupération d'un nom de fichier ( par ligne)
                             listFIles.add(msg_receive);
                             msg_receive = in.readLine();
                         }
@@ -595,6 +637,29 @@ class Server {
         return listFIles;
     }
 
+    public void sendCommand(Serveur serveur, String command) {
+        int port = serveur.port;
+        String ip = serveur.ip;
+
+        Socket clientSocket;
+        PrintWriter out;
+        BufferedReader in;
+        List<String> listFIles = new ArrayList<>();
+
+        try {
+
+            clientSocket = new Socket(ip, port);
+
+            //flux pour envoyer
+            out = new PrintWriter(clientSocket.getOutputStream());
+            //flux pour recevoir
+            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+
+            out.println(command);
+
+        } catch (IOException e) {
+        }
+    }
 }
 
 
