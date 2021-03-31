@@ -1,5 +1,6 @@
 import java.net.*;
 import java.io.*;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.Scanner;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,6 +94,7 @@ class Server {
                             out.println("HELP: list les commandes disponibles");
                             out.println("LIST: permet de demander la liste des fichiers du serveur");
                             out.println("GET [filemane]: permet de télécharger le fichier \"filename\"");
+                            out.println("READ [filemane]: permet de lire le fichier \"filename\"");
                             out.println("CREATE [filemane]: permet de créer un nouveau fichier vide nommé \"filename\"");
                             out.println("WRITE [filemane]: permet d'uploader une nouvelle version du fichier \"filename\"");
                             out.println("DELETE [filemane]: permet de supprimer le fichier \"filename\"");
@@ -102,13 +104,24 @@ class Server {
                          *     LISTE
                          */
                         else if (lines[0].equals("LIST")) {
-                            out.println("WIP list");
                             File file = new File(PATH);
                             File[] files = file.listFiles();
+                            int page = 1, total = (Integer) files.length/5;
+                            if(lines.length == 2) {
+                                page = Integer.parseInt(lines[1]);
+                                if (page > total+1)
+                                    page = total;
+                            }
+                            int max = 5+5*(page-1);
+                            if(max>files.length)
+                                max = files.length;
+                            out.println("page:"+page+" max:"+max+" total:"+total);
+                            File[] subFiles = Arrays.copyOfRange(files,0+5*(page-1),max);
+                            out.println(" ==== List "+page+"/"+total+" ===");
 
                             assert files != null;
                             //out.println("WIP ");
-                            for (File doc : files)
+                            for (File doc : subFiles)
                                 out.println(doc.getName());
 
                             //managementFiles.list();
@@ -119,6 +132,15 @@ class Server {
                                 out.println("Commande incomplete: GET [filemane]");
                             else {
                                 String fileName = (String) lines[1];
+                                managementFiles.upload(fileName);
+                            }
+
+                        }else if (lines[0].equals("READ")) {
+
+                            if( lines.length!=2)
+                                out.println("Commande incomplete: READ [filemane]");
+                            else {
+                                String fileName = (String) lines[1];
                                 managementFiles.readTOSocket(fileName);
                             }
 
@@ -126,8 +148,13 @@ class Server {
 
                         else if (lines[0].equals("CREATE")) {
                             out.println("WIP create");
+                            if(lines.length !=2)
+                                out.println("Commande incomplete : CREATE [filename]");
+                            else {
+                                String fileName = (String) lines[1];
+                                managementFiles.createFile(fileName);
 
-
+                            }
                         }
 
                         else if (lines[0].equals("WRITE")) {
@@ -146,9 +173,8 @@ class Server {
                                 out.println("DELETE [filename]");
                             }
                             else{
-                                File file = new File(PATH + lines[1]);
-                                FileHandle fileHandle = new FileHandle(file);
-                                fileHandle.delete();
+                                String fileName = (String) lines[1];
+                                managementFiles.deleteFile(fileName);
                             }
                         }
 
@@ -220,6 +246,27 @@ class Server {
                 FileHandle file = (FileHandle) this.concurrentHashMap.get(fileName);
                 //envoyer a un socket
                 file.readFile(this.out);
+
+            }
+        }
+
+        /**
+         * une fonction qui permet d'empaqueter l'envoie du contenu d'un fichier,
+         * @param fileName
+         */
+        public void upload(String fileName){
+            if(  this.isExist(fileName)) {
+                FileHandle file = (FileHandle) this.concurrentHashMap.get(fileName);
+                //activation du mode
+                this.out.println("$$download-mode-on$$");
+                //envoie du titre
+                this.out.println("$$download-title-file$$");
+                this.out.println(fileName);
+                //envoyer a un socket
+                file.readFile(this.out);
+                //arret
+                this.out.println("$$download-mode-off$$");
+                this.out.println("Téléchargement terminé");
             }
         }
 
@@ -241,20 +288,27 @@ class Server {
 
 
         //  une fonction qui créée un nouveau fichier (et l'ajoute à la map),
-        public void createFile(String namefile) {
-            File file = new File(namefile);
+        public void createFile(String namefile) throws IOException {
+            File file = new File("Documents/" + namefile);
             FileHandle fileHandle = new FileHandle(file);
             this.concurrentHashMap.put(namefile, fileHandle);
-
-
+            if (file.createNewFile())
+                System.out.println("File created");
+            else
+                System.out.println("File already exists");
         }
 
 
         // une fonction qui supprime un fichier (et qui l'enlève de la map).
+        public void deleteFile(String namefile){
+            File file = new File("Documents/" + namefile);
+            FileHandle fileHandle = new FileHandle(file);
+            fileHandle.delete();
+            this.concurrentHashMap.remove(namefile);
+        }
 
+        //défaut
         public void list() {
-
-
             Enumeration keys = this.concurrentHashMap.keys();
             String key;
             if( keys == null )

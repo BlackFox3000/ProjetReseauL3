@@ -27,7 +27,7 @@ public class Client {
         }
 
         /* Connexion */
-        System.out.println("Essai de connexion à  " + ip + " sur le port " + port + "\n");
+        System.out.println("Essai de connexion à   " + ip + " sur le port " + port + "\n");
         try {
             echoSocket = new Socket(ip, port);
             System.err.println("le n° de la socket est : " + echoSocket);
