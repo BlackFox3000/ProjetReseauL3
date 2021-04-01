@@ -5,11 +5,11 @@ import java.util.concurrent.ConcurrentHashMap;
 
 class Server {
 
-    public ConcurrentHashMap<String, List<Serveur>> locateFiles;
-    public ConcurrentHashMap<String,List<Serveur>> externeFiles;
+    public ConcurrentHashMap<String, List<Serveur>> locateFiles = new ConcurrentHashMap<>();
+    public ConcurrentHashMap<String,List<Serveur>> externeFiles = new ConcurrentHashMap<>();
     String ip = "localhost";
     int port;
-    Serveur serveur;
+    static Serveur serveur;
 
     private static String PATH = "Documents";
 
@@ -149,7 +149,7 @@ class Server {
                                 out.println("Commande incomplete: GET [filemane]");
                             else  if(lines[1].equals("localFiles")){
                                 printConcurrence(locateFiles, out);
-                            }else  if(lines[1].equals("localFiles")){
+                            }else  if(lines[1].equals("externFiles")){
                                 printConcurrence(externeFiles,out);
                             }
                         }
@@ -257,11 +257,13 @@ class Server {
         out.println("----hashMap----");
         Enumeration<String> listTitles = hashMap.keys();
         while (listTitles.hasMoreElements()){
+            System.out.println("passe par là ");
             String title = (String) listTitles.nextElement();
-            String render="["+title+"][ ";
+            StringBuilder render= new StringBuilder("[" + title + "][ ");
             List<Serveur> listServeurs = hashMap.get(title);
-            for (int i=0; i<listServeurs.size(); i++){
-                render += listServeurs.get(i).ip+":"+listServeurs.get(i).port+" | " ;
+            for (Serveur listServeur : listServeurs) {
+                System.out.println("passe par ici ");
+                render.append(listServeur.ip).append(":").append(listServeur.port).append(" | ");
             }
             out.println(render+"]");
         }
@@ -285,6 +287,7 @@ class Server {
          * @param out
          */
         public ManagementFiles(String path, PrintWriter out) {
+            System.out.println("*ManagementFiles");
             this.out = out;
             File doc = new File(path);
             File[] files = doc.listFiles();
@@ -394,6 +397,7 @@ class Server {
     // =================== initialiseLocateFiles ============================//
 
     public void initialiseLocateFiles(String ip, int port) {
+        System.out.println("*initialiseLocateFiles");
         File file = new File("Documents");
         File[] files = file.listFiles();
         ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
@@ -401,19 +405,21 @@ class Server {
 
         for (File doc : files) {
             String nameFile = doc.getName();
-            System.out.println(doc.getName());
+            System.out.println("init:"+doc.getName());
             if (hasmap.containsKey(nameFile)) {
                 // hm[namefile] = [S1|text.txt]
                 List<Serveur> liste = hasmap.get(nameFile);
                 liste.add(serveur);
                 hasmap.put(nameFile, liste);
+                System.out.println("init - keyC:"+nameFile);
             } else {
                 List<Serveur> listServeurs = new ArrayList<>();
                 listServeurs.add(serveur);
                 hasmap.put(nameFile, listServeurs);
+                System.out.println("init - keyN:"+nameFile);
             }
         }
-        this.externeFiles= hasmap;
+        this.locateFiles= hasmap;
     }
 
     // =================== PING ============================//
@@ -423,6 +429,7 @@ class Server {
      * @throws IOException
      */
     private void initialisationExternFiles() throws IOException {
+        System.out.println("*initialisationExternFiles");
         //Lis le server.text et retourne les serveurs connus
         List<List<String>> map = serverTxtToMap();
 
@@ -431,7 +438,7 @@ class Server {
         for (int i = 0; i < map.size(); i++) {
             List<String> serverLi = map.get(i);
             //---------------------------- 100.100.100.200  ---------------- 23584 ----> server.txt
-            Serveur server= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
+            Serveur serveur= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
             //List<String> listTitlesFiles = getFiles(server.ip, server.port, "ping");
             this.externeFiles= getExterneLocalFiles(serveur,"ping" );
 //            for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
@@ -449,24 +456,29 @@ class Server {
     }
 
     public static List<List<String>> serverTxtToMap() throws IOException {
+        System.out.println("*serverTxtToMap");
+
         File file = new File("servers.txt");
         FileReader fr = new FileReader(file);
         List<List<String>> liste = new ArrayList<>();
 
         BufferedReader br = new BufferedReader(fr);
-        StringBuffer sb = new StringBuffer();
+        //StringBuffer sb = new StringBuffer();
         String line;
         Boolean isThisTheFirstLine = true;
         while ((line = br.readLine()) != null) {
             if (!isThisTheFirstLine) {
                 List<String> server = new ArrayList<>();
                 List<String> lines = Arrays.asList(line.split(" "));
-                System.out.println(lines);
-                server.add(lines.get(0));
-                server.add(lines.get(1));
-                System.out.println(server.get(0));
-                System.out.println(server.get(1));
-                liste.add(server);
+                if ( serveur.equals(new Serveur(lines.get(0), Integer.parseInt(lines.get(1)) ) )){
+                    System.out.println(lines);
+                    server.add(lines.get(0));
+                    server.add(lines.get(1));
+
+                    System.out.println(server.get(0));
+                    System.out.println(server.get(1));
+                    liste.add(server);
+                }
 
             }
             isThisTheFirstLine = false;
@@ -479,6 +491,7 @@ class Server {
 
 
     public void connexion(String ip, int port, String msg_send) {
+        System.out.println("*Connexion");
         Socket clientSocket;
         PrintWriter out;
         BufferedReader in;
@@ -602,6 +615,7 @@ class Server {
      * @return liste de fichier List<String>
      */
     public List<String> getFiles(String ip, int port, String state) {
+        System.out.println("*getFiles");
         Socket clientSocket;
         PrintWriter out;
         BufferedReader in;
@@ -696,6 +710,7 @@ class Server {
      * @param serveur
      */
     public void updateExternFiles(Serveur serveur){
+        System.out.println("*updateExternFiles");
         ConcurrentHashMap<String,List<Serveur>> externLocalFiles = getExterneLocalFiles( serveur,  "pong");
         mergeAndUpdateExternalFiles(externLocalFiles);
     }
@@ -706,7 +721,8 @@ class Server {
      * @param statue
      * @return ConcurrentHashMap<String,List<Serveur>>
      */
-    public ConcurrentHashMap<String,List<Serveur>> getExterneLocalFiles(Serveur serveur, String statue){ ;
+    public ConcurrentHashMap<String,List<Serveur>> getExterneLocalFiles(Serveur serveur, String statue){
+        System.out.println("*getExterneLocalFiles");
         List<String> listTitlesFiles = getFiles(serveur.ip, serveur.port, statue);
 
         ConcurrentHashMap<String,List<Serveur>> newConcurenceHashMap = new ConcurrentHashMap<>();
@@ -730,6 +746,7 @@ class Server {
      * @param hashmap
      */
     public void mergeAndUpdateExternalFiles(ConcurrentHashMap<String, List<Serveur>> hashmap) {
+        System.out.println("*mergeAndUpdateExternalFiles");
         Enumeration<String> keyStock = hashmap.keys();
         //tableau de List<Serveur>
         while (keyStock.hasMoreElements()){
@@ -756,8 +773,6 @@ class Server {
         }
 
     }
-
-
 
     //==================== Management xFiles =====================//
 
