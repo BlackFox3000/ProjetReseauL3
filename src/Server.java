@@ -89,7 +89,7 @@ class Server {
                 out.println("Bonjour " + hote + "! (vous utilisez le port " + port + ")");
 
                 ManagementFiles managementFiles = new ManagementFiles(PATH, out);
-
+                initialisationExternFiles();
                 do {
                     /* Faire echo et logguer */
 
@@ -108,7 +108,7 @@ class Server {
                             out.println("==================== HELP ====================");
                             out.println("HELP: list les commandes disponibles");
                             out.println("LIST [num_page]: permet de demander la liste des fichiers du serveur");
-                            out.println("LISTALL : permet de demander la liste de tout les fichiers du serveur");
+                            out.println("LISTALL [state: ping/pong]: permet de demander la liste de tout les fichiers du serveur  (ne pas utiliser state )");
                             out.println("GET [filemane]: permet de télécharger le fichier \"filename\"");
                             out.println("READ [filemane]: permet de lire le fichier \"filename\"");
                             out.println("CREATE [filemane]: permet de créer un nouveau fichier vide nommé \"filename\"");
@@ -143,6 +143,16 @@ class Server {
 
                             //managementFiles.list();
                         }
+                        else if (lines[0].equals("debug")) {
+
+                            if (lines.length != 2)
+                                out.println("Commande incomplete: GET [filemane]");
+                            else  if(lines[1].equals("localFiles")){
+                                printConcurrence(locateFiles, out);
+                            }else  if(lines[1].equals("localFiles")){
+                                printConcurrence(externeFiles,out);
+                            }
+                        }
                         else if (lines[0].equals("LISTALL")) {
                             File file = new File(PATH);
                             File[] files = file.listFiles();
@@ -152,7 +162,12 @@ class Server {
                             for (File doc : files)
                                 out.println(doc.getName());
 
-                            //managementFiles.list();
+                            if (lines.length == 2) {
+                                String state = lines[1];
+                                if (state.equals("ping"));
+                                    updateExternFiles(new Serveur(hote.toString(),port));
+
+                            }
                         }
                         else if (lines[0].equals("GET")) {
 
@@ -237,87 +252,21 @@ class Server {
         }
     }
 
-    /**
-     * Initialise la hashmap de fichier (key) et de list de serveur où ils sont présents List<Serveur>
-     * @throws IOException
-     */
-    private void initialisationExternFiles() throws IOException {
-        //Lis le server.text et retourne les serveurs connus
-        List<List<String>> map = serverTxtToMap();
-
-
-        //parcourt de tout les serveurs
-        for (int i = 0; i < map.size(); i++) {
-            List<String> serverLi = map.get(i);
-            //---------------------------- 100.100.100.200  ---------------- 23584 ----> server.txt
-            Serveur server= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
-            List<String> listTitlesFiles = getFiles(server.ip, server.port);
-
-            for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
-                //on vérifie que la clef est présente dans notre hashmap
-                String titleFile = listTitlesFiles.get(i);
-                List<Serveur> listServeurs;
-                if(this.externeFiles.containsKey(titleFile))
-                    listServeurs = this.externeFiles.get(titleFile);
-                else
-                    listServeurs = new ArrayList<>();
-                listServeurs.add(server);
-                this.externeFiles.put(titleFile, listServeurs);
+    //=================== Debug ============================//
+    private void printConcurrence(ConcurrentHashMap<String, List<Serveur>> hashMap, PrintWriter out) {
+        out.println("----hashMap----");
+        Enumeration<String> listTitles = hashMap.keys();
+        while (listTitles.hasMoreElements()){
+            String title = (String) listTitles.nextElement();
+            String render="["+title+"][ ";
+            List<Serveur> listServeurs = hashMap.get(title);
+            for (int i=0; i<listServeurs.size(); i++){
+                render += listServeurs.get(i).ip+":"+listServeurs.get(i).port+" | " ;
             }
+            out.println(render+"]");
         }
     }
-
-    public static List<List<String>> serverTxtToMap() throws IOException {
-        File file = new File("servers.txt");
-        FileReader fr = new FileReader(file);
-        List<List<String>> liste = new ArrayList<>();
-
-        BufferedReader br = new BufferedReader(fr);
-        StringBuffer sb = new StringBuffer();
-        String line;
-        Boolean isThisTheFirstLine = true;
-        while ((line = br.readLine()) != null) {
-            if (!isThisTheFirstLine) {
-                List<String> server = new ArrayList<>();
-                List<String> lines = Arrays.asList(line.split(" "));
-                System.out.println(lines);
-                server.add(lines.get(0));
-                server.add(lines.get(1));
-                System.out.println(server.get(0));
-                System.out.println(server.get(1));
-                liste.add(server);
-
-            }
-            isThisTheFirstLine = false;
-
-        }
-        fr.close();
-        System.out.println(liste);
-        return liste;
-    }
-
-    public void initialiseLocateFiles(String ip, int port) {
-        File file = new File("Documents");
-        File[] files = file.listFiles();
-        ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
-        Serveur serveur = new Serveur(ip, port);
-
-        for (File doc : files) {
-            String nameFile = doc.getName();
-            System.out.println(doc.getName());
-            if (hasmap.containsKey(nameFile)) {
-                // hm[namefile] = [S1|text.txt]
-                List<Serveur> liste = hasmap.get(nameFile);
-                liste.add(serveur);
-                hasmap.put(nameFile, liste);
-            } else {
-                List<Serveur> listServeurs = new ArrayList<>();
-                listServeurs.add(serveur);
-                hasmap.put(nameFile, listServeurs);
-            }
-        }
-        this.externeFiles= hasmap;
-    }
+    //=================== ManagementFiles ============================//
 
     class ManagementFiles {
         public ConcurrentHashMap<String, FileHandle> concurrentHashMap = new ConcurrentHashMap<>();
@@ -442,15 +391,92 @@ class Server {
         }
     }
 
-    public void deleteExterneFile(String fileName, Serveur serveur){
-        if (locateFiles.get(fileName).size() > 1) {
-            List<Serveur> listeServeur = locateFiles.get(fileName);
-            listeServeur.remove(serveur);
-            locateFiles.put(fileName, listeServeur);
+    // =================== initialiseLocateFiles ============================//
+
+    public void initialiseLocateFiles(String ip, int port) {
+        File file = new File("Documents");
+        File[] files = file.listFiles();
+        ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
+        Serveur serveur = new Serveur(ip, port);
+
+        for (File doc : files) {
+            String nameFile = doc.getName();
+            System.out.println(doc.getName());
+            if (hasmap.containsKey(nameFile)) {
+                // hm[namefile] = [S1|text.txt]
+                List<Serveur> liste = hasmap.get(nameFile);
+                liste.add(serveur);
+                hasmap.put(nameFile, liste);
+            } else {
+                List<Serveur> listServeurs = new ArrayList<>();
+                listServeurs.add(serveur);
+                hasmap.put(nameFile, listServeurs);
+            }
         }
-        else
-            locateFiles.remove(fileName);
+        this.externeFiles= hasmap;
     }
+
+    // =================== PING ============================//
+
+    /**
+     * Initialise la hashmap de fichier (key) et de list de serveur où ils sont présents List<Serveur>
+     * @throws IOException
+     */
+    private void initialisationExternFiles() throws IOException {
+        //Lis le server.text et retourne les serveurs connus
+        List<List<String>> map = serverTxtToMap();
+
+
+        //parcourt de tout les serveurs
+        for (int i = 0; i < map.size(); i++) {
+            List<String> serverLi = map.get(i);
+            //---------------------------- 100.100.100.200  ---------------- 23584 ----> server.txt
+            Serveur server= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
+            //List<String> listTitlesFiles = getFiles(server.ip, server.port, "ping");
+            this.externeFiles= getExterneLocalFiles(serveur,"ping" );
+//            for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
+//                //on vérifie que la clef est présente dans notre hashmap
+//                String titleFile = listTitlesFiles.get(indexFile);
+//                List<Serveur> listServeurs;
+//                if(this.externeFiles.containsKey(titleFile))
+//                    listServeurs = this.externeFiles.get(titleFile);
+//                else
+//                    listServeurs = new ArrayList<>();
+//                listServeurs.add(server);
+//                this.externeFiles.put(titleFile, listServeurs);
+//            }
+        }
+    }
+
+    public static List<List<String>> serverTxtToMap() throws IOException {
+        File file = new File("servers.txt");
+        FileReader fr = new FileReader(file);
+        List<List<String>> liste = new ArrayList<>();
+
+        BufferedReader br = new BufferedReader(fr);
+        StringBuffer sb = new StringBuffer();
+        String line;
+        Boolean isThisTheFirstLine = true;
+        while ((line = br.readLine()) != null) {
+            if (!isThisTheFirstLine) {
+                List<String> server = new ArrayList<>();
+                List<String> lines = Arrays.asList(line.split(" "));
+                System.out.println(lines);
+                server.add(lines.get(0));
+                server.add(lines.get(1));
+                System.out.println(server.get(0));
+                System.out.println(server.get(1));
+                liste.add(server);
+
+            }
+            isThisTheFirstLine = false;
+
+        }
+        fr.close();
+        System.out.println(liste);
+        return liste;
+    }
+
 
     public void connexion(String ip, int port, String msg_send) {
         Socket clientSocket;
@@ -572,9 +598,10 @@ class Server {
      * Envoie un READALL sur le serveur cible
      * @param ip
      * @param port
+     * @param state ; défini par ping ou pong
      * @return liste de fichier List<String>
      */
-    public List<String> getFiles(String ip, int port) {
+    public List<String> getFiles(String ip, int port, String state) {
         Socket clientSocket;
         PrintWriter out;
         BufferedReader in;
@@ -598,7 +625,7 @@ class Server {
             final Thread[] envoyer = {new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    out.println("LISTALL");
+                    out.println("LISTALL "+state);
                     out.flush();
 
                 }
@@ -660,6 +687,91 @@ class Server {
         } catch (IOException e) {
         }
     }
+
+
+    //========================= PONG ============================//
+
+    /**
+     * Scan les fichiers locaux du serveur et actualise l'externFile
+     * @param serveur
+     */
+    public void updateExternFiles(Serveur serveur){
+        ConcurrentHashMap<String,List<Serveur>> externLocalFiles = getExterneLocalFiles( serveur,  "pong");
+        mergeAndUpdateExternalFiles(externLocalFiles);
+    }
+
+    /**
+     * Récupérer le localFiles d'un serveur
+     * @param serveur
+     * @param statue
+     * @return ConcurrentHashMap<String,List<Serveur>>
+     */
+    public ConcurrentHashMap<String,List<Serveur>> getExterneLocalFiles(Serveur serveur, String statue){ ;
+        List<String> listTitlesFiles = getFiles(serveur.ip, serveur.port, statue);
+
+        ConcurrentHashMap<String,List<Serveur>> newConcurenceHashMap = new ConcurrentHashMap<>();
+
+        for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
+            //on vérifie que la clef est présente dans notre hashmap
+            String titleFile = listTitlesFiles.get(indexFile);
+            List<Serveur> listServeurs;
+            if(newConcurenceHashMap.containsKey(titleFile))
+                listServeurs = newConcurenceHashMap.get(titleFile);
+            else
+                listServeurs = new ArrayList<>();
+            listServeurs.add(serveur);
+            newConcurenceHashMap.put(titleFile, listServeurs);
+        }
+        return newConcurenceHashMap;
+    }
+
+    /**
+     * Merge un ConcurretHashMap avec l'externetFiles
+     * @param hashmap
+     */
+    public void mergeAndUpdateExternalFiles(ConcurrentHashMap<String, List<Serveur>> hashmap) {
+        Enumeration<String> keyStock = hashmap.keys();
+        //tableau de List<Serveur>
+        while (keyStock.hasMoreElements()){
+            String key = keyStock.nextElement();
+            if(this.externeFiles.containsKey(key)){
+
+                List<Serveur> ext = this.externeFiles.get(key);
+                List<Serveur> hash = hashmap.get(key);
+
+                for(int i=0; 0<ext.size(); i++){
+                    boolean add =true;
+                    for(int j=0; j<hash.size() && add ; j++){
+                        if( ext.get(i).egal(hash.get(j)))
+                            add=false;
+                    }
+                    if(add)
+                        hash.add(ext.get(i));
+                }
+                this.externeFiles.put(key,hash);
+            }
+            else{
+                this.externeFiles.put(key, hashmap.get(key));
+            }
+        }
+
+    }
+
+
+
+    //==================== Management xFiles =====================//
+
+    public void deleteExterneFile(String fileName, Serveur serveur){
+        if (locateFiles.get(fileName).size() > 1) {
+            List<Serveur> listeServeur = locateFiles.get(fileName);
+            listeServeur.remove(serveur);
+            locateFiles.put(fileName, listeServeur);
+        }
+        else
+            locateFiles.remove(fileName);
+    }
+
+
 }
 
 

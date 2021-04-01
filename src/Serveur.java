@@ -7,4 +7,8 @@ public class Serveur {
         this.ip = ip;
         this.port = port;
     }
+
+    public boolean egal(Serveur serveur) {
+        return this.ip==serveur.ip && this.port == serveur.port;
+    }
 }

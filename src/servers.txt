@@ -1,2 +1,2 @@
-# adresses     port
-localhost    1234
+# adresses port
+localhost 1234
