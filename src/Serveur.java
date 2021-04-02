@@ -9,6 +9,6 @@ public class Serveur {
     }
 
     public boolean egal(Serveur serveur) {
-        return this.ip==serveur.ip && this.port == serveur.port;
+        return this.ip.equals(serveur.ip) && this.port.equals(serveur.port);
     }
 }

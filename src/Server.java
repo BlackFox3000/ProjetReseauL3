@@ -11,10 +11,10 @@ class Server {
     int port;
     static Serveur serveur;
 
-    private static String PATH = "Documents";
+    private static String PATH = "Documents1234";
 
     /* Démarrage et délégation des connexions entrantes */
-    public void demarrer(int port) {
+    public void demarrer(int port) throws IOException {
         ServerSocket ssocket; // socket d'écoute utilisée par le serveur
 
         System.out.println("Lancement du serveur sur le port " + port );
@@ -23,7 +23,7 @@ class Server {
         this.port = port;
         this.serveur = new Serveur(this.ip, this.port);
         initialiseLocateFiles(this.ip,port);
-
+        initialisationExternFiles();
         try {
             ssocket = new ServerSocket(port);
             ssocket.setReuseAddress(true); /* rend le port réutilisable rapidement */
@@ -89,7 +89,7 @@ class Server {
                 out.println("Bonjour " + hote + "! (vous utilisez le port " + port + ")");
 
                 ManagementFiles managementFiles = new ManagementFiles(PATH, out);
-                initialisationExternFiles();
+
                 do {
                     /* Faire echo et logguer */
 
@@ -162,11 +162,11 @@ class Server {
                             for (File doc : files)
                                 out.println(doc.getName());
 
-                            if (lines.length == 2) {
+                            if (lines.length == 4) {
                                 String state = lines[1];
-                                if (state.equals("ping"));
-                                    updateExternFiles(new Serveur(hote.toString(),port));
-
+                                System.out.println("State:"+state);
+                                if (state.equals("ping"))
+                                    updateExternFiles(new Serveur(lines[2],Integer.parseInt(lines[3])));
                             }
                         }
                         else if (lines[0].equals("GET")) {
@@ -257,12 +257,10 @@ class Server {
         out.println("----hashMap----");
         Enumeration<String> listTitles = hashMap.keys();
         while (listTitles.hasMoreElements()){
-            System.out.println("passe par là ");
             String title = (String) listTitles.nextElement();
             StringBuilder render= new StringBuilder("[" + title + "][ ");
             List<Serveur> listServeurs = hashMap.get(title);
             for (Serveur listServeur : listServeurs) {
-                System.out.println("passe par ici ");
                 render.append(listServeur.ip).append(":").append(listServeur.port).append(" | ");
             }
             out.println(render+"]");
@@ -362,7 +360,7 @@ class Server {
 
         //  une fonction qui créée un nouveau fichier (et l'ajoute à la map),
         public void createFile(String namefile) throws IOException {
-            File file = new File("Documents/" + namefile);
+            File file = new File("Documents1234/" + namefile);
             FileHandle fileHandle = new FileHandle(file);
             this.concurrentHashMap.put(namefile, fileHandle);
             if (file.createNewFile())
@@ -374,7 +372,7 @@ class Server {
 
         // une fonction qui supprime un fichier (et qui l'enlève de la map).
         public void deleteFile(String namefile) {
-            File file = new File("Documents/" + namefile);
+            File file = new File("Documents1234/" + namefile);
             FileHandle fileHandle = new FileHandle(file);
             fileHandle.delete();
             this.concurrentHashMap.remove(namefile);
@@ -398,7 +396,7 @@ class Server {
 
     public void initialiseLocateFiles(String ip, int port) {
         System.out.println("*initialiseLocateFiles");
-        File file = new File("Documents");
+        File file = new File("Documents1234");
         File[] files = file.listFiles();
         ConcurrentHashMap<String, List<Serveur>> hasmap = new ConcurrentHashMap<>();
         Serveur serveur = new Serveur(ip, port);
@@ -433,12 +431,14 @@ class Server {
         //Lis le server.text et retourne les serveurs connus
         List<List<String>> map = serverTxtToMap();
 
-
+        System.out.println("passe par là: "+map.size());
         //parcourt de tout les serveurs
         for (int i = 0; i < map.size(); i++) {
+            System.out.println("Passe par ici");
             List<String> serverLi = map.get(i);
             //---------------------------- 100.100.100.200  ---------------- 23584 ----> server.txt
-            Serveur serveur= new Serveur(serverLi.get(0), Integer.parseInt( serverLi.get(1)) );
+            Serveur serveur= new Serveur( serverLi.get(0), Integer.parseInt(serverLi.get(1)) );
+            System.out.println("initExt:"+serveur.ip+" "+serveur.port);
             //List<String> listTitlesFiles = getFiles(server.ip, server.port, "ping");
             this.externeFiles= getExterneLocalFiles(serveur,"ping" );
 //            for(int indexFile =0; indexFile<listTitlesFiles.size(); indexFile++){
@@ -470,7 +470,9 @@ class Server {
             if (!isThisTheFirstLine) {
                 List<String> server = new ArrayList<>();
                 List<String> lines = Arrays.asList(line.split(" "));
-                if ( serveur.equals(new Serveur(lines.get(0), Integer.parseInt(lines.get(1)) ) )){
+                System.out.println("true:"+(serveur.ip.equals(lines.get(0)) && serveur.port==Integer.parseInt(lines.get(1))));
+                System.out.println("AAAAAh: serveur"+serveur.ip+":"+serveur.port+" //"+lines.get(0)+":"+Integer.parseInt(lines.get(1)));
+                if ( ! (serveur.ip.equals(lines.get(0)) && serveur.port==Integer.parseInt(lines.get(1)) )){
                     System.out.println(lines);
                     server.add(lines.get(0));
                     server.add(lines.get(1));
@@ -616,32 +618,33 @@ class Server {
      */
     public List<String> getFiles(String ip, int port, String state) {
         System.out.println("*getFiles");
-        Socket clientSocket;
+        Socket clientSocketGetFiles;
         PrintWriter out;
         BufferedReader in;
         List<String> listFIles = new ArrayList<>();
 
-        System.out.println("Essai de connexion à   " + ip + " sur le port " + port + "\n");
+        System.out.println("Essai de connexion à  " + ip + " sur le port " + port + "\n");
         /* Session */
         try {
             /*  Connexion
              * les informations du serveur ( port et adresse IP ou nom d'hote
              * 127.0.0.1 est l'adresse local de la machine
              */
-            clientSocket = new Socket(ip, port);
-
+            System.out.println("getFiles:"+ip+" "+port);
+            clientSocketGetFiles = new Socket(ip, port);
+            System.out.println("test1");
             //flux pour envoyer
-            out = new PrintWriter(clientSocket.getOutputStream());
+            out = new PrintWriter(clientSocketGetFiles.getOutputStream());
             //flux pour recevoir
-            in = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            in = new BufferedReader(new InputStreamReader(clientSocketGetFiles.getInputStream()));
 
             //envoie de la requête
             final Thread[] envoyer = {new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    out.println("LISTALL "+state);
+                    System.out.println("test2");
+                    out.println("LISTALL "+state+" "+serveur.ip+" "+serveur.port);
                     out.flush();
-
                 }
             })};
             envoyer[0].start();
@@ -655,14 +658,14 @@ class Server {
                     try {
                         msg_receive = in.readLine();
                         while (msg_receive != null) {
-                            System.out.println("[getFiles]" + ip + " " + msg_receive);
+                            System.out.println("[getFiles]" + ip +":"+port+ " " + msg_receive);
                             // récupération d'un nom de fichier ( par ligne)
                             listFIles.add(msg_receive);
                             msg_receive = in.readLine();
                         }
                         System.out.println("Serveur déconecté");
                         out.close();
-                        clientSocket.close();
+                        clientSocketGetFiles.close();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
